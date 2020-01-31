@@ -1,0 +1,108 @@
+# version
+#
+auth --enableshadow --passalgo=sha512
+# Use CDROM installation media
+cdrom
+# Use graphical install
+graphical
+# Run the Setup Agent on first boot
+firstboot --disable
+ignoredisk --only-use=vda
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us'
+# System language
+lang en_US.UTF-8
+# Firewall Settings
+firewall --enabled --ssh --http --port=5901:tcp 
+# Selinux settings
+selinux --enforcing
+# Accept EULA
+eula --agreed
+# Reboot after install
+reboot
+
+# Network information
+network --bootproto=static --device=eth0 --ip=192.168.10.123 --netmask=255.255.255.0 --gateway=192.168.10.1 --nameserver=172.24.11.120 --onboot=yes
+network  --hostname=rhce-desktop.example.com
+
+# Root password
+rootpw --plaintext mypassword
+# System services
+services --enabled=chronyd --enabled=httpd
+# System timezone
+timezone Europe/Sofia --isUtc
+user --groups=wheel --name=student --password=mypassword --plaintext --gecos="RHCE Student"
+# System bootloader configuration
+bootloader --append="crashkernel=auto" --location=mbr --boot-drive=vda
+# Partition clearing information
+clearpart --all --initlabel --drives=vda
+# Disk partitioning information
+part /boot --fstype="xfs" --ondisk=vda --size=1024
+part swap --fstype="swap" --ondisk=vda --recommended
+part pv.01 --fstype="lvmpv" --ondisk=vda --size=1 --grow
+volgroup vg_rhce-desktop --pesize=4096 pv.01
+logvol /  --fstype="xfs" --grow --percent=100 --name=root --vgname=vg_rhce-desktop
+
+%packages
+@^gnome-desktop-environment
+-gnome-initial-setup
+vim
+chrony
+kexec-tools
+httpd
+tigervnc-server
+
+%end
+
+################################################################################
+##                                                                            ##
+##                     PostInstall Script                                     ##
+##                                                                            ##
+################################################################################
+
+%post --log=/root/ks-post.log
+################################################################################
+# Setting ssh-access to the server
+#       * Disable sshd naming resolution
+sed -i -e 's/GSSAPIAuthentication\ yes/\GSSAPIAuthentication\ no/g' \
+    -e '/#X11UseLocalhost yes/a X11UseLocalhost no' \
+    /etc/ssh/sshd_config
+echo "
+UseDNS no
+" >> /etc/ssh/sshd_config
+
+################################################################################
+# Setup network interface
+echo 'SUBSYSTEM=="net", ACTION=="add", KERNEL=="eth1", \
+RUN+="/usr/local/sbin/lab_nw.sh"
+' > /etc/udev/rules.d/70-assign-net-ipaddress.rules
+
+udevadm control --reload
+
+echo '#!/bin/bash
+
+nmcli connection show "Wired connection 1" >&2
+if [[ $? -eq 0 ]]
+then 
+        nmcli connection delete "Wired connection 1"
+        nmcli device disconnect eth1
+        nmcli con add con-name eth1 ifname eth1 type ethernet ip4 172.24.11.123/24 
+        nmcli con up eth1
+fi
+' > /usr/local/sbin/lab_nw.sh
+
+chmod +x /usr/local/sbin/lab_nw.sh
+
+echo '@reboot /usr/local/sbin/lab_nw.sh' > /tmp/root.crontab
+crontab /tmp/root.crontab
+rm /tmp/root.crontab
+
+################################################################################
+# Setup RHCE Exam repository
+sudo rm -rf /etc/yum.repos.d/*
+echo '[rhce-repo]
+name=rhce-repo
+baseurl=ftp://rhce-ipa.example.com/repo
+gpgcheck=0' > /etc/yum.repos.d/rhce-repo.repo
+
+%end

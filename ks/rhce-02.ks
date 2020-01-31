@@ -1,0 +1,83 @@
+# version
+#
+auth --enableshadow --passalgo=sha512
+# Use CDROM installation media
+cdrom
+# Use graphical install
+graphical
+# Run the Setup Agent on first boot
+firstboot --disable
+ignoredisk --only-use=vda
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us'
+# System language
+lang en_US.UTF-8
+# Firewall Settings
+firewall --enabled --port=22:tcp
+# Selinux settings
+selinux --permissive 
+# Accept EULA
+eula --agreed
+# Reboot after install
+reboot
+
+# Network information
+network --bootproto=static --device=eth0 --ip=172.24.11.122 --netmask=255.255.255.0 --gateway=172.24.11.1 --nameserver=172.24.11.120 --onboot=yes
+network  --hostname=rhce-02.example.com
+
+# Root password
+rootpw --plaintext polezna
+# System services
+services --enabled="chronyd"
+# System timezone
+timezone Europe/Sofia --isUtc
+# System bootloader configuration
+bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=vda
+# Partition clearing information
+clearpart --all --initlabel --drives=vda
+# Disk partitioning information
+part /boot --fstype="xfs" --ondisk=vda --size=1000
+part swap --fstype="swap" --ondisk=vda --size=1024
+part pv.01 --fstype="lvmpv" --ondisk=vda --size=1 --grow
+volgroup vg_rhce-02 --pesize=4096 pv.01
+logvol /  --fstype="xfs" --grow --percent=100 --name=root --vgname=vg_rhce-02
+
+# Setup Packages
+%packages
+@^minimal
+@core
+vim
+chrony
+kexec-tools
+policycoreutils-python
+bash-completion
+
+%end
+
+################################################################################
+################################################################################
+##                                                                            ##
+##                     PostInstall Script                                     ##
+##                                                                            ##
+################################################################################
+################################################################################
+%post
+
+################################################################################
+# Setting ssh-access to the server
+#       * Disable sshd naming resolution
+sed -i \
+    -e 's/GSSAPIAuthentication\ yes/\#GSSAPIAuthentication\ no/g' \
+    -e '/#X11UseLocalhost yes/a X11UseLocalhost no' \
+    /etc/ssh/sshd_config
+echo " UseDNS no " >> /etc/ssh/sshd_config
+
+################################################################################
+# Setup RHCE Exam repository
+sudo rm -rf /etc/yum.repos.d/*
+echo '[rhce-repo]
+name=rhce-repo
+baseurl=ftp://rhce-ipa.example.com/repo
+gpgcheck=0' > /etc/yum.repos.d/rhce-repo.repo
+
+%end
