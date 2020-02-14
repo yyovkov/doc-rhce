@@ -38,6 +38,20 @@ git clone https://github.com/yyovkov/doc-rhce.git /tmp/doc-rhce
 C7CDROM="/var/lib/virtpools/system/CentOS-7.0-1406-x86_64-DVD.iso"
 ```
 
+* Install RHCE-IPA
+
+``` bash
+virt-install --name=LAB__rhce_ipa__59120 \
+    --location="${C7CDROM}" \
+    --disk "pool=local,size=10,sparse=false,perms=rw" \
+    --initrd-inject="/tmp/doc-rhce/ks/rhce-ipa.conf" \
+    --extra-args "ks=file:/rhce-ipa.conf" \
+    --graphics "vnc,listen=0.0.0.0,port=59120" \
+    --network network=rhce-lab \
+    --vcpus=2 --ram=1024 \
+    --os-variant=centos7.0
+```
+
 * Install RHCE-DESKTOP
 
 ``` bash
@@ -51,20 +65,6 @@ virt-install --name=LAB__rhce_desktop__59123 \
     --vcpus=2 --ram=1024 \
     --os-variant=centos7.0 \
 && virsh attach-interface --domain LAB__rhce_desktop__59123 --type network --source rhce-lab --model virtio --config --live
-```
-
-* Install RHCE-IPA
-
-``` bash
-virt-install --name=LAB__rhce_ipa__59120 \
-    --location="${C7CDROM}" \
-    --disk "pool=local,size=10,sparse=false,perms=rw" \
-    --initrd-inject="/tmp/doc-rhce/ks/rhce-ipa.conf" \
-    --extra-args "ks=file:/rhce-ipa.conf" \
-    --graphics "vnc,listen=0.0.0.0,port=59120" \
-    --network network=rhce-lab \
-    --vcpus=2 --ram=1024 \
-    --os-variant=centos7.0
 ```
 
 * Install RHCE-01
